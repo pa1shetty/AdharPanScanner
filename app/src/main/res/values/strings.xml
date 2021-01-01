@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">AdharPanScanner</string>
+    <string name="scan_adhar_card">Scan Adhar Card</string>
+    <string name="scan_pan_card">Scan Pan Card</string>
+    <string name="export">Export</string>
+    <string name="clear">Clear</string>
+    <string name="govt_of_india">GOVERNMENT OF INDIA</string>
+    <string name="ITI">INCOME TAX DEPARTMENT</string>
+</resources>
