@@ -4,6 +4,31 @@
     <string name="scan_pan_card">Scan Pan Card</string>
     <string name="export">Export</string>
     <string name="clear">Clear</string>
-    <string name="govt_of_india">GOVERNMENT OF INDIA</string>
-    <string name="ITI">INCOME TAX DEPARTMENT</string>
+    <string name="govt">GOVERNMENT</string>
+    <string name="income">INCOME</string>
+    <string name="tax">TAX</string>
+    <string name="ind">INDIA</string>
+    <string name="no_pan_data">Couldn\'t read PAN card, Please try again.</string>
+    <string name="no_crop_image">Couldn\'t crop the image, Please try again.</string>
+    <string name="no_adhar_data">Couldn\'t Read Adhar Card, Please Try Again.</string>
+    <string name="no_export_data">Couldn\'t export the data, Please try again.</string>
+    <string name="export_success">Data exported successfully!</string>
+    <string name="user_data_sheet">user_data_sheet</string>
+    <string name="user_name">NAME</string>
+    <string name="adhar_number">ADHAR NUMBER</string>
+    <string name="pan_number">PAN NUMBER</string>
+    <string name="loading_pan_data">Loading PAN data.</string>
+    <string name="give_storage_permission">Please give storage permission.</string>
+    <string name="give_camera_permission">Please give camera permission.</string>
+
+    <string name="no_pan_number">Couldn\'t get PAN number, Please try again.</string>
+    <string name="success_pan">Pan data retrieved!</string>
+    <string name="no_data_to_export">No data to export.</string>
+    <string name="scan_adhar_first">Please scan Adhar card first.</string>
+    <string name="exporting_user_data">Exporting user data.</string>
+    <string name="delete_user_data">Deleting user data.</string>
+    <string name="adhar_success">Adhar data retrieved!</string>
+    <string name="data_cleared">User data cleared.</string>
+    <string name="no_user_data_present">No user data present to clear.</string>
+    <string name="loading_adhar_data">Loading Adhar data.</string>
 </resources>

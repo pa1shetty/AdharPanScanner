@@ -4,6 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:id="@+id/cl_main"
     tools:context=".MainActivity">
 
 
@@ -16,7 +17,7 @@
         app:layout_constraintBottom_toTopOf="@+id/btnPan"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-       />
+        />
 
     <CheckBox
         android:id="@+id/cbAdhar"
@@ -26,7 +27,6 @@
         app:layout_constraintEnd_toStartOf="@+id/btnAdhar"
         app:layout_constraintStart_toStartOf="parent"
         android:clickable="false"
-
         />
     <Button
         android:id="@+id/btnPan"

@@ -1,85 +1,77 @@
 package com.example.adharpanscanner;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.Activity;
-import android.content.Context;
+import android.app.ProgressDialog;
+import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.content.res.AssetManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Point;
-import android.graphics.Rect;
-import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
-import android.widget.Toast;
 
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.room.Room;
+
+import com.google.android.material.snackbar.Snackbar;
 import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
+import com.theartofdev.edmodo.cropper.CropImage;
+import com.theartofdev.edmodo.cropper.CropImageView;
 
 import org.apache.poi.hssf.usermodel.HSSFCell;
 import org.apache.poi.hssf.usermodel.HSSFRow;
 import org.apache.poi.hssf.usermodel.HSSFSheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
-import org.apache.poi.ss.SpreadsheetVersion;
-import org.apache.poi.ss.formula.udf.UDFFinder;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.CreationHelper;
-import org.apache.poi.ss.usermodel.DataFormat;
-import org.apache.poi.ss.usermodel.Font;
-import org.apache.poi.ss.usermodel.FormulaEvaluator;
-import org.apache.poi.ss.usermodel.Name;
-import org.apache.poi.ss.usermodel.PictureData;
 import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.SheetVisibility;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.Iterator;
 import java.util.List;
-import java.util.logging.XMLFormatter;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import static org.apache.poi.ss.usermodel.WorkbookFactory.*;
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.core.Observer;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
+
+import static com.example.adharpanscanner.OtherFunctionalities.isValidAadharNumber;
+import static com.example.adharpanscanner.OtherFunctionalities.isValidPANNumber;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
+    private static final int MY_PERMISSIONS_REQUEST_CAMERA_ADHAR = 3;
+    private static final int MY_PERMISSIONS_REQUEST_CAMERA_PAN = 4;
+    private static final int MY_PERMISSIONS_REQUEST_CAMERA = 5;
+    private static int CURRENT_REQUEST;
     Button buttonAdhar, buttonPan, btnClear, btnExport;
     CheckBox checkBoxAdhar, checkBoxPan;
     UserData userData;
-    private int WRITE_PERMISSION = 1;
-
+    ProgressDialog mProgressDialog;
+    Snackbar mSnackBar;
+    ConstraintLayout constraintLayout;
+    File filePath;
+    UserDatabase userDatabase;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        System.setProperty("org.apache.poi.javax.xml.stream.XMLOutputFactory", "com.fasterxml.aalto.stax.OutputFactoryImpl");
-        System.setProperty("org.apache.poi.javax.xml.stream.XMLEventFactory", "com.fasterxml.aalto.stax.EventFactoryImpl");
+        filePath = new File(this.getExternalFilesDir(null).getAbsolutePath() + "/user_data.xls");
+        Log.d("pavan", "onCreate: " + filePath);
+        constraintLayout = findViewById(R.id.cl_main);
+        mProgressDialog = new ProgressDialog(this);
+        mProgressDialog.setCanceledOnTouchOutside(false);
         buttonAdhar = findViewById(R.id.btnAdhar);
         buttonPan = findViewById(R.id.btnPan);
         btnClear = findViewById(R.id.btnClear);
@@ -93,279 +85,481 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         checkBoxAdhar.setOnClickListener(this);
         checkBoxPan.setOnClickListener(this);
         userData = new UserData();
+        disableCheckBoxClick();
+        CURRENT_REQUEST = MY_PERMISSIONS_REQUEST_CAMERA_ADHAR;
+        createDBObjectRX();
+
 
     }
 
-
-    private void getNameAndAdharNo(@NotNull Text result) {
-        String resultText = result.getText();
-        boolean saveName = false;
-        String userAdharNo = null;
-        if (resultText.contains(getString(R.string.govt_of_india))) {
-            for (Text.TextBlock block : result.getTextBlocks()) {
-                for (Text.Line line : block.getLines()) {
-                    if (saveName && userData.userName == null) {
-                        userData.userName = line.getText();
-                    }
-                    if (line.getText().contains(getString(R.string.govt_of_india))) {
-                        saveName = true;
-                    }
-                    if (line.getText().length() == 14) {
-                        if (isValidAadharNumber(line.getText())) {
-                            userAdharNo = line.getText();
-                            userData.userAdharNo = userAdharNo;
-                        }
-                    }
-                }
-            }
-            if (userData.userName != null && userAdharNo != null) {
-                Log.d("pavan", "user name is : " + userData.userName + " " + userAdharNo);
-                checkBoxAdhar.setChecked(true);
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+       if (requestCode == MY_PERMISSIONS_REQUEST_CAMERA) {
+            boolean cameraPermissionGiven = grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            if (cameraPermissionGiven) {
+                CropImage.activity(null).setGuidelines(CropImageView.Guidelines.ON).setAllowFlipping(false).setAutoZoomEnabled(true).start(this);
             } else {
-                //Log.d("pavan", "could'nt find  Name and Adhar Id ");
+                setUpSnackBar("e", getString(R.string.give_camera_permission));
+                setProgressBar(false, "");
             }
-        } else {
-            //Log.d("pavan", "onSuccess:Not Adhar Card\n ");
+
         }
     }
 
-    private boolean isValidAadharNumber(String str) {
-        String regex = "^[2-9]{1}[0-9]{3}\\s[0-9]{4}\\s[0-9]{4}$";
-        Pattern p = Pattern.compile(regex);
-        Matcher m = p.matcher(str);
-        return m.matches();
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == CropImage.CROP_IMAGE_ACTIVITY_REQUEST_CODE) {
+            CropImage.ActivityResult result = CropImage.getActivityResult(data);
+            if (resultCode == RESULT_OK) {
+                assert result != null;
+                Uri croppedImageURI = result.getUri();
+                if (croppedImageURI != null) {
+                    if (CURRENT_REQUEST == MY_PERMISSIONS_REQUEST_CAMERA_ADHAR) {
+                        getDataFromAdharImage(croppedImageURI);
+                    } else if (CURRENT_REQUEST == MY_PERMISSIONS_REQUEST_CAMERA_PAN) {
+                        getDataFromPanImage(croppedImageURI);
+                    }
+                }
+            } else if (resultCode == CropImage.CROP_IMAGE_ACTIVITY_RESULT_ERROR_CODE) {
+                setUpSnackBar("e", getString(R.string.no_crop_image));
+            }
+        }
     }
 
-    int adharCount = 1, panCount = 1;
 
     @SuppressLint("NonConstantResourceId")
     @Override
     public void onClick(@NotNull View v) {
         switch (v.getId()) {
             case R.id.btnAdhar:
-                Uri uri = Uri.parse("android.resource://" + getPackageName() + "/" + R.drawable.a1);
-                Toast.makeText(this, "Adhar Button Clicked " + adharCount, Toast.LENGTH_SHORT).show();
-                switch (adharCount) {
-                    case 1:
-                        uri = Uri.parse("android.resource://" + getPackageName() + "/" + R.drawable.a1);
-                        adharCount++;
-                        break;
-                    case 2:
-                        uri = Uri.parse("android.resource://" + getPackageName() + "/" + R.drawable.a2);
-                        adharCount++;
-                        break;
-                    case 3:
-                        uri = Uri.parse("android.resource://" + getPackageName() + "/" + R.drawable.a3);
-                        adharCount++;
-                        break;
-                    case 4:
-                        uri = Uri.parse("android.resource://" + getPackageName() + "/" + R.drawable.a4);
-                        adharCount = 1;
-                        break;
-                }
-                InputImage image = null;
-                try {
-                    image = InputImage.fromFilePath(this, uri);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                TextRecognizer recognizer = TextRecognition.getClient();
-                recognizer.process(image)
-                        .addOnSuccessListener(this::getNameAndAdharNo)
-                        .addOnFailureListener(
-                                e -> {
-
-                                });
-
+                captureCard(MY_PERMISSIONS_REQUEST_CAMERA_ADHAR);
                 break;
             case R.id.btnPan:
-                uri = Uri.parse("android.resource://" + getPackageName() + "/" + R.drawable.a1);
-                Toast.makeText(this, "Adhar Button Clicked " + adharCount, Toast.LENGTH_SHORT).show();
-                switch (panCount) {
-                    case 1:
-                        uri = Uri.parse("android.resource://" + getPackageName() + "/" + R.drawable.p1);
-                        panCount++;
-                        break;
-                    case 2:
-                        uri = Uri.parse("android.resource://" + getPackageName() + "/" + R.drawable.p2);
-                        panCount++;
-                        break;
-                    case 3:
-                        uri = Uri.parse("android.resource://" + getPackageName() + "/" + R.drawable.p3);
-                        panCount = 1;
-                        break;
-
+                if (userData.userName != null) {
+                    captureCard(MY_PERMISSIONS_REQUEST_CAMERA_PAN);
+                } else {
+                    setUpSnackBar("c", getString(R.string.scan_adhar_first));
                 }
-                image = null;
-                try {
-                    image = InputImage.fromFilePath(this, uri);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                recognizer = TextRecognition.getClient();
-                recognizer.process(image)
-                        .addOnSuccessListener(this::getDOBFromPan)
-                        .addOnFailureListener(
-                                e -> {
-
-                                });
                 break;
             case R.id.btnExport:
-                if (userData.userName == null || userData.userAdharNo == null) {
-                    Toast.makeText(this, "Adhar Card data not added", Toast.LENGTH_SHORT).show();
-
-                } else if (userData.userDOB == null) {
-                    Toast.makeText(this, "PAN Card data not added", Toast.LENGTH_SHORT).show();
-                } else {
-                    //Log.d("pavan", "onClick: "+userData.userName+" "+userData.userAdharNo+" "+userData.userDOB);
-                    saveUserData();
-                }
-
+                getAllUserDataRX();
                 break;
             case R.id.btnClear:
-                Toast.makeText(this, "Clear Button Clicked", Toast.LENGTH_SHORT).show();
-
-                break;
-            case R.id.cbAdhar:
-                checkBoxAdhar.setChecked(checkBoxAdhar.isChecked());
-                Toast.makeText(this, "Adhar Checkbox Clicked", Toast.LENGTH_SHORT).show();
-
-                break;
-            case R.id.cbPan:
-                Toast.makeText(this, "Pan Checkbox Clicked", Toast.LENGTH_SHORT).show();
-                checkBoxPan.setChecked(checkBoxPan.isChecked());
+                setProgressBar(true, getString(R.string.delete_user_data));
+                deleteExcelSheet();
                 break;
             default:
-                throw new IllegalStateException("Unexpected value: " + v.getId());
+                break;
         }
     }
 
-    private void saveUserData() {
-        if(checkStoragePermission()){
-            Log.d("pavan", "saveUserData: Permission Present");
-            excelTransaction();
-        }
-    }
 
-    private boolean checkStoragePermission() {
-        if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
 
-            ActivityCompat.requestPermissions((Activity) this,
-                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, WRITE_PERMISSION);
-
-            return false;
+    //Take Image of Adhar card or PAN card
+    private void captureCard(int requestId) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CAMERA},
+                    MY_PERMISSIONS_REQUEST_CAMERA);
         } else {
-            return true;
+            CropImage.activity(null).setGuidelines(CropImageView.Guidelines.ON).start(this);
+
+        }
+        CURRENT_REQUEST = requestId;
+    }
+
+    //Get Text from Adhar Card
+    private void getDataFromAdharImage(Uri croppedAdharURI) {
+        setProgressBar(true, getString(R.string.loading_adhar_data));
+        try {
+            InputImage inputImageCroppedAdhar = InputImage.fromFilePath(this, croppedAdharURI);
+            TextRecognizer recognizer = TextRecognition.getClient();
+            recognizer.process(inputImageCroppedAdhar)
+                    .addOnSuccessListener(this::getNameAndAdharNo)
+                    .addOnFailureListener(
+                            e -> {
+                                setProgressBar(false, "");
+                                setUpSnackBar("e", getString(R.string.no_adhar_data));
+                            });
+        } catch (IOException e) {
+            setProgressBar(false, "");
+            setUpSnackBar("e", getString(R.string.no_adhar_data));
+            e.printStackTrace();
+        }
+
+    }
+
+    //Get Text from PAN card
+    private void getDataFromPanImage(Uri croppedPanURI) {
+        setProgressBar(true, getString(R.string.loading_pan_data));
+        try {
+            InputImage inputImageCroppedPan = InputImage.fromFilePath(this, croppedPanURI);
+            TextRecognizer recognizer = TextRecognition.getClient();
+            recognizer.process(inputImageCroppedPan)
+                    .addOnSuccessListener(this::getPanNumber)
+                    .addOnFailureListener(
+                            e -> {
+                                setProgressBar(false, "");
+                                setUpSnackBar("e", getString(R.string.no_pan_data));
+                            });
+        } catch (IOException e) {
+            setProgressBar(false, "");
+            setUpSnackBar("e", getString(R.string.no_pan_data));
+            e.printStackTrace();
         }
     }
 
-    private void getDOBFromPan(@NotNull Text visionText) {
+
+
+
+    //Get Name and Adhar number from Adhar card
+    private void getNameAndAdharNo(@NotNull Text result) {
+        String resultText = result.getText();
+        boolean saveName = false;
+        if (resultText.contains(getString(R.string.govt)) || resultText.contains(getString(R.string.ind))) {
+            for (Text.TextBlock block : result.getTextBlocks()) {
+                for (Text.Line line : block.getLines()) {
+                    if (saveName && userData.userName == null) {
+                        userData.userName = line.getText();
+                    }
+                    if (line.getText().contains(getString(R.string.govt)) || line.getText().contains(getString(R.string.ind))) {
+                        saveName = true;
+                    }
+                    if (line.getText().length() == 14) {
+                        if (isValidAadharNumber(line.getText())) {
+                            userData.userAdharNo = line.getText();
+                        }
+                    }
+                }
+            }
+            if (userData.userName != null && userData.userAdharNo != null) {
+                checkBoxAdhar.setChecked(true);
+                setUpSnackBar("s", getString(R.string.adhar_success));
+            } else {
+                setUpSnackBar("e", getString(R.string.no_adhar_data));
+            }
+        } else {
+            setUpSnackBar("e", getString(R.string.no_adhar_data));
+        }
+        setProgressBar(false, "");
+    }
+
+
+    //Get PAN number from PAN card
+    private void getPanNumber(@NotNull Text visionText) {
         String resultText = visionText.getText();
-        if (resultText.contains(getString(R.string.ITI))) {
+        if (resultText.contains(getString(R.string.income)) || resultText.contains(getString(R.string.tax))) {
             for (Text.TextBlock block : visionText.getTextBlocks()) {
                 for (Text.Line line : block.getLines()) {
                     String lineText = line.getText();
                     if (lineText.length() == 10) {
-                        if (isValidDOB(lineText)) {
-                            userData.userDOB = lineText;
+                        if (isValidPANNumber(lineText)) {
+                            userData.userPanNo = lineText;
                             break;
                         }
                     }
                 }
             }
-            if (userData.userDOB != null) {
-                Log.d("pavan", "dob: " + userData.userDOB);
+            if (userData.userPanNo != null) {
                 checkBoxPan.setChecked(true);
+                addDataToDBRX(userData);
+                resetUserData();
             } else {
-                //Log.d("pavan", "dob: No DOB");
+                setUpSnackBar("e", getString(R.string.no_pan_number));
             }
         } else {
-            //Log.d("pavan", "not Adhar card: ");
+            setUpSnackBar("e", getString(R.string.no_pan_data));
         }
-
-
+        setProgressBar(false, "");
     }
 
-    private boolean isValidDOB(@NotNull String input) {
-        return input.matches("([0-9]{2})/([0-9]{2})/([0-9]{4})");
 
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        if (requestCode == WRITE_PERMISSION) {
-            if (grantResults.length > 0) {
-                boolean writePermissionGiven = grantResults[0] == PackageManager.PERMISSION_GRANTED;
-                if (writePermissionGiven) {
-                    Log.d("pavan", "onRequestPermissionsResult: Permission Given");
-                    excelTransaction();
-                } else {
-                    Log.d("pavan", "onRequestPermissionsResult: Permission Not Given");
-
-                }
-            }
-        }
-    }
-
-    private void excelTransaction(){
-        int rowCount=0;
-        HSSFWorkbook hssfWorkbook = new HSSFWorkbook();
-        HSSFSheet hssfSheet = hssfWorkbook.createSheet("Custom Sheet");
-        File filePath = new File(Environment.getExternalStorageDirectory() + "/Demo.xls");
-        if (!filePath.exists()){
+    // Exporting Data to Excel
+    private void excelTransaction(List<UserData> userDataList) {
+        if (!filePath.exists()) {
             try {
                 filePath.createNewFile();
+                createNewSheet(filePath,userDataList);
             } catch (IOException e) {
+                setProgressBar(false, "");
+                setUpSnackBar("e", getString(R.string.no_export_data));
                 e.printStackTrace();
             }
-        }
-        else {
-            rowCount=readExcel();
-        }
-
-        Log.d("pavan", "excelTransaction: "+rowCount);
-        for(Row row: hssfSheet)     //iteration over row using for each loop
-        {
-            for (Cell cell : row)    //iteration over cell using for each loop
-            Log.d("pavan", "excelTransaction: "+cell.getStringCellValue());
-        }
-        HSSFRow hssfRow = hssfSheet.createRow(rowCount);
-
-        HSSFCell hssfCell = hssfRow.createCell(0);
-        hssfCell.setCellValue(userData.userName);
-         hssfCell = hssfRow.createCell(1);
-        hssfCell.setCellValue(userData.userDOB);
-         hssfCell = hssfRow.createCell(2);
-        hssfCell.setCellValue(userData.userAdharNo);
-
-
-
-
-        try {
-            FileOutputStream fileOutputStream= new FileOutputStream(filePath);
-            hssfWorkbook.write(fileOutputStream);
-
-            if (fileOutputStream!=null){
-                fileOutputStream.flush();
-                fileOutputStream.close();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } else {
+            updateSheet(filePath,userDataList);
         }
     }
 
-    private int readExcel() {
-        HSSFWorkbook wb = null;
+    //Create new Excel sheet
+    private void createNewSheet(File filePath, List<UserData> userDataList) {
+        HSSFWorkbook hssfWorkbook = new HSSFWorkbook();
+        HSSFSheet hssfSheet = hssfWorkbook.createSheet(getString(R.string.user_data_sheet));
+        Row header = hssfSheet.createRow(0);
+        header.createCell(0).setCellValue(getString(R.string.user_name));
+        header.createCell(1).setCellValue(getString(R.string.adhar_number));
+        header.createCell(2).setCellValue(getString(R.string.pan_number));
+        for (int userDataCount = 0; userDataCount < userDataList.size(); userDataCount++) {
+            int rowNo = userDataCount + 1;
+            HSSFRow hssfRow = hssfSheet.createRow(rowNo);
+            HSSFCell hssfCell = hssfRow.createCell(0);
+            hssfCell.setCellValue(userDataList.get(userDataCount).getUserName());
+            hssfCell = hssfRow.createCell(1);
+            hssfCell.setCellValue(userDataList.get(userDataCount).getUserAdharNo());
+            hssfCell = hssfRow.createCell(2);
+            hssfCell.setCellValue(userDataList.get(userDataCount).getUserPanNo());
+        }
+
         try {
-            FileInputStream fis = new FileInputStream(new File(Environment.getExternalStorageDirectory() + "/Demo.xls"));
-            wb = new HSSFWorkbook(fis);
-        } catch (IOException e) {
+            FileOutputStream fileOutputStream = new FileOutputStream(filePath);
+            hssfWorkbook.write(fileOutputStream);
+
+            fileOutputStream.flush();
+            fileOutputStream.close();
+            resetUserData();
+            setUpSnackBar("s", getString(R.string.export_success));
+        } catch (Exception e) {
+            setUpSnackBar("e", getString(R.string.no_export_data));
             e.printStackTrace();
         }
-        HSSFSheet sheet = wb.getSheetAt(0);         
-        return sheet.getPhysicalNumberOfRows();
+        setProgressBar(false, "");
+    }
 
-        
+    //Update existing  Excel sheet
+    private void updateSheet(File filePath, List<UserData> userDataList) {
+        HSSFWorkbook hssfWorkbook;
+        try {
+            FileInputStream fis = new FileInputStream(filePath);
+            hssfWorkbook = new HSSFWorkbook(fis);
+            HSSFSheet hssfSheet = hssfWorkbook.getSheetAt(0);
+            for (int userDataCount = 0; userDataCount < userDataList.size(); userDataCount++) {
+                HSSFRow hssfRow = hssfSheet.createRow(hssfSheet.getPhysicalNumberOfRows() + userDataCount);
+                HSSFCell hssfCell = hssfRow.createCell(0);
+                hssfCell.setCellValue(userDataList.get(userDataCount).getUserName());
+                hssfCell = hssfRow.createCell(1);
+                hssfCell.setCellValue(userDataList.get(userDataCount).getUserAdharNo());
+                hssfCell = hssfRow.createCell(2);
+                hssfCell.setCellValue(userDataList.get(userDataCount).getUserPanNo());
+            }
+            FileOutputStream fileOutputStream = new FileOutputStream(filePath);
+            hssfWorkbook.write(fileOutputStream);
+            fileOutputStream.flush();
+            fileOutputStream.close();
+            resetUserData();
+            setUpSnackBar("s", getString(R.string.export_success));
+        } catch (IOException e) {
+            setUpSnackBar("e", getString(R.string.no_export_data));
+            e.printStackTrace();
+        }
+        setProgressBar(false, "");
+    }
+
+
+    //Delete Excel Sheet
+    private void deleteExcelSheet() {
+        if (filePath.exists()) {
+            filePath.delete();
+            setUpSnackBar("s", getString(R.string.data_cleared));
+        } else {
+            setUpSnackBar("c", getString(R.string.no_user_data_present));
+        }
+        deleteAllUsersRX();
+        setProgressBar(false,"");
+    }
+
+    //Disable checkbox click
+    private void disableCheckBoxClick() {
+        checkBoxAdhar.setOnCheckedChangeListener((buttonView, isChecked) -> checkBoxAdhar.setChecked(userData.userName != null && userData.userAdharNo != null));
+        checkBoxPan.setOnCheckedChangeListener((buttonView, isChecked) -> checkBoxPan.setChecked(userData.userPanNo != null));
+    }
+
+
+    private void setUpSnackBar(@NotNull String status, String message) {
+        switch (status) {
+            case "s":
+                mSnackBar = Snackbar
+                        .make(constraintLayout, message, Snackbar.LENGTH_LONG);
+                mSnackBar.setBackgroundTint(ContextCompat.getColor(this, R.color.green));
+                mSnackBar.show();
+                break;
+            case "e":
+                mSnackBar = Snackbar
+                        .make(constraintLayout, message, Snackbar.LENGTH_LONG);
+                mSnackBar.setBackgroundTint(ContextCompat.getColor(this, R.color.red));
+                mSnackBar.show();
+                break;
+            default:
+                mSnackBar = Snackbar
+                        .make(constraintLayout, message, Snackbar.LENGTH_LONG);
+                mSnackBar.show();
+                break;
+        }
+    }
+
+    private void setProgressBar(boolean b, String message) {
+        if (b) {
+            mProgressDialog.show();
+            mProgressDialog.setMessage(message);
+
+        } else {
+            mProgressDialog.hide();
+        }
+    }
+
+
+    //Clear user model
+    private void resetUserData() {
+        userData = new UserData();
+        checkBoxAdhar.setChecked(false);
+        checkBoxPan.setChecked(false);
+    }
+
+
+    
+
+    //Database  operation using RXJava
+    private void createDBObjectRX() {
+        Observable.fromCallable(this::createDBObject).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Observer<UserDatabase>() {
+                    @Override
+                    public void onSubscribe(@NonNull Disposable d) {
+
+                    }
+
+                    @Override
+                    public void onNext(@NonNull UserDatabase db) {
+                        userDatabase =db;
+                        Log.d("pavan ", "onNext:db created ");
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable e) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+                    }
+                });
+    }
+    private void addDataToDBRX(UserData userData) {
+        Observable.fromCallable(() -> addDataToDB(userData)).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Observer<Boolean>() {
+                    @Override
+                    public void onSubscribe(@NonNull Disposable d) {
+
+                    }
+                    @Override
+                    public void onNext(@NonNull Boolean bool) {
+                       if(bool){
+                           setUpSnackBar("s", getString(R.string.success_pan));
+                       }
+                       else {
+                           setUpSnackBar("e","Please try again.");
+                       }
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable e) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+                    }
+                });
+    }
+    private void getAllUserDataRX() {
+        Observable.fromCallable(this::getAllUserData).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Observer<List<UserData>>() {
+                    @Override
+                    public void onSubscribe(@NonNull Disposable d) {
+
+                    }
+                    @Override
+                    public void onNext(@NonNull List<UserData> userDataList) {
+                        Log.d("pavan", "onNext: "+userDataList.size());
+                        if (userDataList.size() == 0) {
+                             setUpSnackBar("c", getString(R.string.no_data_to_export));
+                         } else {
+                             setProgressBar(true, getString(R.string.exporting_user_data));
+                                 excelTransaction(userDataList);
+
+                            deleteAllUsersRX();
+                         }
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable e) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+                    }
+                });
+    }
+    private void deleteAllUsersRX() {
+        Observable.fromCallable(this::deleteAllUserData).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Observer<Boolean>() {
+                    @Override
+                    public void onSubscribe(@NonNull Disposable d) {
+
+                    }
+                    @Override
+                    public void onNext(@NonNull Boolean bool) {
+                    }
+                    @Override
+                    public void onError(@NonNull Throwable e) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+                    }
+                });
+    }
+
+    @NotNull
+    private UserDatabase createDBObject(){
+        return Room.databaseBuilder(getApplicationContext(),
+                UserDatabase.class, "user_data").build();
+    }
+
+
+    private boolean addDataToDB(UserData userData){
+        if(userDatabase !=null){
+            UserDao userDao = userDatabase.userDao();
+            userDao.insertAll(userData);
+            return true;
+        }
+        else {
+            createDBObjectRX();
+            return false;
+        }
+
+    }
+    private List<UserData> getAllUserData(){
+        if(userDatabase !=null){
+            UserDao userDao = userDatabase.userDao();
+            return userDao.getAll();
+        }
+        else {
+            createDBObjectRX();
+            return null;
+        }
+
+    }
+
+    private boolean deleteAllUserData(){
+        if(userDatabase !=null){
+            UserDao userDao = userDatabase.userDao();
+            userDao.delete();
+            return true;
+        }
+        else {
+            createDBObjectRX();
+            return false;
+        }
     }
 }
