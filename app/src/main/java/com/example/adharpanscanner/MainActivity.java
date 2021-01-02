@@ -58,7 +58,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Button buttonAdhar, buttonPan, btnClear, btnExport;
     CheckBox checkBoxAdhar, checkBoxPan;
     UserData userData;
-    ProgressDialog mProgressDialog;
     Snackbar mSnackBar;
     ConstraintLayout constraintLayout;
     File filePath;
@@ -70,8 +69,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         filePath = new File(this.getExternalFilesDir(null).getAbsolutePath() + "/user_data.xls");
         Log.d("pavan", "onCreate: " + filePath);
         constraintLayout = findViewById(R.id.cl_main);
-        mProgressDialog = new ProgressDialog(this);
-        mProgressDialog.setCanceledOnTouchOutside(false);
         buttonAdhar = findViewById(R.id.btnAdhar);
         buttonPan = findViewById(R.id.btnPan);
         btnClear = findViewById(R.id.btnClear);
@@ -84,7 +81,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         btnExport.setOnClickListener(this);
         checkBoxAdhar.setOnClickListener(this);
         checkBoxPan.setOnClickListener(this);
-        userData = new UserData();
+        userData=new UserData();
         disableCheckBoxClick();
         CURRENT_REQUEST = MY_PERMISSIONS_REQUEST_CAMERA_ADHAR;
         createDBObjectRX();
@@ -100,7 +97,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 CropImage.activity(null).setGuidelines(CropImageView.Guidelines.ON).setAllowFlipping(false).setAutoZoomEnabled(true).start(this);
             } else {
                 setUpSnackBar("e", getString(R.string.give_camera_permission));
-                setProgressBar(false, "");
+                
             }
 
         }
@@ -146,7 +143,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 getAllUserDataRX();
                 break;
             case R.id.btnClear:
-                setProgressBar(true, getString(R.string.delete_user_data));
                 deleteExcelSheet();
                 break;
             default:
@@ -163,7 +159,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     new String[]{Manifest.permission.CAMERA},
                     MY_PERMISSIONS_REQUEST_CAMERA);
         } else {
-            CropImage.activity(null).setGuidelines(CropImageView.Guidelines.ON).start(this);
+            CropImage.activity(null).setGuidelines(CropImageView.Guidelines.ON).setAllowFlipping(false).setAutoZoomEnabled(true).start(this);
 
         }
         CURRENT_REQUEST = requestId;
@@ -171,7 +167,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     //Get Text from Adhar Card
     private void getDataFromAdharImage(Uri croppedAdharURI) {
-        setProgressBar(true, getString(R.string.loading_adhar_data));
+        userData = new UserData();
         try {
             InputImage inputImageCroppedAdhar = InputImage.fromFilePath(this, croppedAdharURI);
             TextRecognizer recognizer = TextRecognition.getClient();
@@ -179,11 +175,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     .addOnSuccessListener(this::getNameAndAdharNo)
                     .addOnFailureListener(
                             e -> {
-                                setProgressBar(false, "");
+                                
                                 setUpSnackBar("e", getString(R.string.no_adhar_data));
                             });
         } catch (IOException e) {
-            setProgressBar(false, "");
+            
             setUpSnackBar("e", getString(R.string.no_adhar_data));
             e.printStackTrace();
         }
@@ -192,7 +188,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     //Get Text from PAN card
     private void getDataFromPanImage(Uri croppedPanURI) {
-        setProgressBar(true, getString(R.string.loading_pan_data));
         try {
             InputImage inputImageCroppedPan = InputImage.fromFilePath(this, croppedPanURI);
             TextRecognizer recognizer = TextRecognition.getClient();
@@ -200,11 +195,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     .addOnSuccessListener(this::getPanNumber)
                     .addOnFailureListener(
                             e -> {
-                                setProgressBar(false, "");
                                 setUpSnackBar("e", getString(R.string.no_pan_data));
                             });
         } catch (IOException e) {
-            setProgressBar(false, "");
             setUpSnackBar("e", getString(R.string.no_pan_data));
             e.printStackTrace();
         }
@@ -242,7 +235,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         } else {
             setUpSnackBar("e", getString(R.string.no_adhar_data));
         }
-        setProgressBar(false, "");
     }
 
 
@@ -271,7 +263,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         } else {
             setUpSnackBar("e", getString(R.string.no_pan_data));
         }
-        setProgressBar(false, "");
+        
     }
 
 
@@ -282,7 +274,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 filePath.createNewFile();
                 createNewSheet(filePath,userDataList);
             } catch (IOException e) {
-                setProgressBar(false, "");
+                
                 setUpSnackBar("e", getString(R.string.no_export_data));
                 e.printStackTrace();
             }
@@ -322,7 +314,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             setUpSnackBar("e", getString(R.string.no_export_data));
             e.printStackTrace();
         }
-        setProgressBar(false, "");
+        
     }
 
     //Update existing  Excel sheet
@@ -351,7 +343,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             setUpSnackBar("e", getString(R.string.no_export_data));
             e.printStackTrace();
         }
-        setProgressBar(false, "");
+        
     }
 
 
@@ -364,11 +356,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             setUpSnackBar("c", getString(R.string.no_user_data_present));
         }
         deleteAllUsersRX();
-        setProgressBar(false,"");
     }
 
     //Disable checkbox click
     private void disableCheckBoxClick() {
+        Log.d("pavan", "disableCheckBoxClick: ");
         checkBoxAdhar.setOnCheckedChangeListener((buttonView, isChecked) -> checkBoxAdhar.setChecked(userData.userName != null && userData.userAdharNo != null));
         checkBoxPan.setOnCheckedChangeListener((buttonView, isChecked) -> checkBoxPan.setChecked(userData.userPanNo != null));
     }
@@ -396,15 +388,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    private void setProgressBar(boolean b, String message) {
-        if (b) {
-            mProgressDialog.show();
-            mProgressDialog.setMessage(message);
-
-        } else {
-            mProgressDialog.hide();
-        }
-    }
+   
 
 
     //Clear user model
@@ -482,7 +466,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         if (userDataList.size() == 0) {
                              setUpSnackBar("c", getString(R.string.no_data_to_export));
                          } else {
-                             setProgressBar(true, getString(R.string.exporting_user_data));
                                  excelTransaction(userDataList);
 
                             deleteAllUsersRX();
@@ -561,5 +544,44 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             createDBObjectRX();
             return false;
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+       
+        super.onDestroy();
+    }
+
+    //To handle orientation change.
+    @Override
+    public void onSaveInstanceState(Bundle savedInstanceState) {
+        if(userData!=null){
+            if(userData.userName!=null){
+                savedInstanceState.putString("userName", userData.userName);
+            } if(userData.userAdharNo!=null){ savedInstanceState.putString("userAdharNo", userData.userAdharNo);
+            } if(userData.getUserPanNo()!=null){
+                savedInstanceState.putString("userPan", userData.userPanNo);
+            }
+        }
+        super.onSaveInstanceState(savedInstanceState);
+    }
+
+//onRestoreInstanceState
+    @Override
+    public void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        userData=new UserData();
+        userData.userName=savedInstanceState.getString("userName");
+        userData.userAdharNo=savedInstanceState.getString("userAdharNo");
+        userData.userPanNo=savedInstanceState.getString("userPanNo");
+        updateCheckBox();
+    }
+
+    private void updateCheckBox() {
+        Log.d("pavan", "updateCheckBox: ");
+        if(userData.userName != null && userData.userAdharNo != null&&userData.userPanNo==null){
+            checkBoxAdhar.setChecked(true);
+        }
+
     }
 }

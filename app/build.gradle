@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId "com.example.adharpanscanner"
-        minSdkVersion 21
+        minSdkVersion 26
         targetSdkVersion 30
         versionCode 1
         versionName "1.0"
@@ -39,7 +39,6 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
     implementation 'com.google.android.gms:play-services-mlkit-text-recognition:16.1.2'
-    implementation 'org.apache.poi:poi:4.1.2'
     implementation 'org.apache.poi:poi-ooxml:4.1.2'
     def room_version = "2.2.6"
     api 'com.theartofdev.edmodo:android-image-cropper:2.8.0'
