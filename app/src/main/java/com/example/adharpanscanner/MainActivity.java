@@ -1,10 +1,7 @@
 package com.example.adharpanscanner;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.ProgressDialog;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
@@ -16,7 +13,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.room.Room;
 
@@ -26,7 +22,6 @@ import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
 import com.theartofdev.edmodo.cropper.CropImage;
-import com.theartofdev.edmodo.cropper.CropImageView;
 
 import org.apache.poi.hssf.usermodel.HSSFCell;
 import org.apache.poi.hssf.usermodel.HSSFRow;
@@ -53,8 +48,10 @@ import static com.example.adharpanscanner.OtherFunctionalities.isValidPANNumber;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     private static final int MY_PERMISSIONS_REQUEST_CAMERA_ADHAR = 3;
     private static final int MY_PERMISSIONS_REQUEST_CAMERA_PAN = 4;
-    private static final int MY_PERMISSIONS_REQUEST_CAMERA = 5;
+    private static final int REQUEST_CAMERA_ACTIVITY = 10;
+
     private static int CURRENT_REQUEST;
+    File fileTemp=null;
     Button buttonAdhar, buttonPan, btnClear, btnExport;
     CheckBox checkBoxAdhar, checkBoxPan;
     UserData userData;
@@ -85,28 +82,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         disableCheckBoxClick();
         CURRENT_REQUEST = MY_PERMISSIONS_REQUEST_CAMERA_ADHAR;
         createDBObjectRX();
-
-
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-       if (requestCode == MY_PERMISSIONS_REQUEST_CAMERA) {
-            boolean cameraPermissionGiven = grantResults[0] == PackageManager.PERMISSION_GRANTED;
-            if (cameraPermissionGiven) {
-                CropImage.activity(null).setGuidelines(CropImageView.Guidelines.ON).setAllowFlipping(false).setAutoZoomEnabled(true).start(this);
-            } else {
-                setUpSnackBar("e", getString(R.string.give_camera_permission));
-                
-            }
 
-        }
-    }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
         if (requestCode == CropImage.CROP_IMAGE_ACTIVITY_REQUEST_CODE) {
+            Log.d("pavan", "onActivityResult: "+data);
+            Log.d("pavan3", "onActivityResult: "+requestCode+" "+resultCode);
+
             CropImage.ActivityResult result = CropImage.getActivityResult(data);
             if (resultCode == RESULT_OK) {
                 assert result != null;
@@ -117,10 +104,40 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     } else if (CURRENT_REQUEST == MY_PERMISSIONS_REQUEST_CAMERA_PAN) {
                         getDataFromPanImage(croppedImageURI);
                     }
+                    deleteTempFile();
                 }
             } else if (resultCode == CropImage.CROP_IMAGE_ACTIVITY_RESULT_ERROR_CODE) {
                 setUpSnackBar("e", getString(R.string.no_crop_image));
             }
+            else {
+                deleteTempFile();
+
+            }
+
+        }
+        else if(requestCode==REQUEST_CAMERA_ACTIVITY)
+        {
+            if(resultCode==RESULT_OK) {
+               // int req_type=data.getIntExtra("req_type",1);
+
+                String message = data.getStringExtra("file_path");
+
+                 fileTemp = new File(message);
+                Uri uri = Uri.fromFile(new File(message));
+                CropImage.activity(uri).setAutoZoomEnabled(true).setAllowFlipping(false)
+                        .start(this);
+            }
+            else {
+
+                setUpSnackBar("e", getString(R.string.try_gain));
+
+            }
+        }
+
+    }
+    private void deleteTempFile(){
+        if(fileTemp!=null){
+            fileTemp.delete();
         }
     }
 
@@ -133,11 +150,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 captureCard(MY_PERMISSIONS_REQUEST_CAMERA_ADHAR);
                 break;
             case R.id.btnPan:
-                if (userData.userName != null) {
                     captureCard(MY_PERMISSIONS_REQUEST_CAMERA_PAN);
-                } else {
-                    setUpSnackBar("c", getString(R.string.scan_adhar_first));
-                }
                 break;
             case R.id.btnExport:
                 getAllUserDataRX();
@@ -154,20 +167,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     //Take Image of Adhar card or PAN card
     private void captureCard(int requestId) {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.CAMERA},
-                    MY_PERMISSIONS_REQUEST_CAMERA);
-        } else {
-            CropImage.activity(null).setGuidelines(CropImageView.Guidelines.ON).setAllowFlipping(false).setAutoZoomEnabled(true).start(this);
-
-        }
         CURRENT_REQUEST = requestId;
+        Intent intent=new Intent(MainActivity.this,CameraActivity.class);
+        intent.putExtra("req_type",requestId);
+        startActivityForResult(intent,REQUEST_CAMERA_ACTIVITY);
     }
 
     //Get Text from Adhar Card
     private void getDataFromAdharImage(Uri croppedAdharURI) {
-        userData = new UserData();
         try {
             InputImage inputImageCroppedAdhar = InputImage.fromFilePath(this, croppedAdharURI);
             TextRecognizer recognizer = TextRecognition.getClient();
@@ -175,11 +182,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     .addOnSuccessListener(this::getNameAndAdharNo)
                     .addOnFailureListener(
                             e -> {
-                                
+
                                 setUpSnackBar("e", getString(R.string.no_adhar_data));
                             });
         } catch (IOException e) {
-            
+
             setUpSnackBar("e", getString(R.string.no_adhar_data));
             e.printStackTrace();
         }
@@ -226,8 +233,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
                 }
             }
+
             if (userData.userName != null && userData.userAdharNo != null) {
                 checkBoxAdhar.setChecked(true);
+                addDataToModel();
                 setUpSnackBar("s", getString(R.string.adhar_success));
             } else {
                 setUpSnackBar("e", getString(R.string.no_adhar_data));
@@ -235,6 +244,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         } else {
             setUpSnackBar("e", getString(R.string.no_adhar_data));
         }
+    }
+
+    private void addDataToModel() {
+        Log.d("pavan", "addDataToModel: "+userData.userName+" "+userData.userAdharNo+" "+userData.userPanNo);
+ if(userData.userName!=null&&userData.userAdharNo!=null&&userData.userPanNo!=null){
+     addDataToDBRX(userData);
+     resetUserData();
+ }
     }
 
 
@@ -253,17 +270,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
                 }
             }
-            if (userData.userPanNo != null) {
+             if (userData.userPanNo != null) {
                 checkBoxPan.setChecked(true);
-                addDataToDBRX(userData);
-                resetUserData();
+                addDataToModel();
+                setUpSnackBar("s", getString(R.string.pan_success));
+
             } else {
                 setUpSnackBar("e", getString(R.string.no_pan_number));
             }
         } else {
             setUpSnackBar("e", getString(R.string.no_pan_data));
         }
-        
+
     }
 
 
@@ -274,7 +292,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 filePath.createNewFile();
                 createNewSheet(filePath,userDataList);
             } catch (IOException e) {
-                
+
                 setUpSnackBar("e", getString(R.string.no_export_data));
                 e.printStackTrace();
             }
@@ -314,7 +332,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             setUpSnackBar("e", getString(R.string.no_export_data));
             e.printStackTrace();
         }
-        
+
     }
 
     //Update existing  Excel sheet
@@ -343,7 +361,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             setUpSnackBar("e", getString(R.string.no_export_data));
             e.printStackTrace();
         }
-        
+
     }
 
 
@@ -361,8 +379,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     //Disable checkbox click
     private void disableCheckBoxClick() {
         Log.d("pavan", "disableCheckBoxClick: ");
-        checkBoxAdhar.setOnCheckedChangeListener((buttonView, isChecked) -> checkBoxAdhar.setChecked(userData.userName != null && userData.userAdharNo != null));
-        checkBoxPan.setOnCheckedChangeListener((buttonView, isChecked) -> checkBoxPan.setChecked(userData.userPanNo != null));
+        checkBoxAdhar.setOnCheckedChangeListener((buttonView, isChecked) -> checkBoxAdhar.setChecked(userData.userName != null && userData.userAdharNo != null&& userData.userPanNo == null));
+        checkBoxPan.setOnCheckedChangeListener((buttonView, isChecked) -> checkBoxPan.setChecked(userData.userPanNo != null&&userData.userName == null && userData.userAdharNo == null));
     }
 
 
@@ -388,18 +406,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-   
+
 
 
     //Clear user model
     private void resetUserData() {
-        userData = new UserData();
         checkBoxAdhar.setChecked(false);
         checkBoxPan.setChecked(false);
+        userData = new UserData();
+
     }
 
 
-    
+
 
     //Database  operation using RXJava
     private void createDBObjectRX() {
@@ -436,7 +455,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     @Override
                     public void onNext(@NonNull Boolean bool) {
                        if(bool){
-                           setUpSnackBar("s", getString(R.string.success_pan));
+                           setUpSnackBar("s", getString(R.string.user_data_retrived));
                        }
                        else {
                            setUpSnackBar("e","Please try again.");
@@ -548,7 +567,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     protected void onDestroy() {
-       
+        Log.d("pavan2", "onDestroy: ");
+        deleteTempFile();
         super.onDestroy();
     }
 

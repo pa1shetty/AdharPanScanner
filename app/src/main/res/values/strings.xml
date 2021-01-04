@@ -17,18 +17,15 @@
     <string name="user_name">NAME</string>
     <string name="adhar_number">ADHAR NUMBER</string>
     <string name="pan_number">PAN NUMBER</string>
-    <string name="loading_pan_data">Loading PAN data.</string>
-    <string name="give_storage_permission">Please give storage permission.</string>
-    <string name="give_camera_permission">Please give camera permission.</string>
 
     <string name="no_pan_number">Couldn\'t get PAN number, Please try again.</string>
-    <string name="success_pan">Pan data retrieved!</string>
     <string name="no_data_to_export">No data to export.</string>
-    <string name="scan_adhar_first">Please scan Adhar card first.</string>
-    <string name="exporting_user_data">Exporting user data.</string>
-    <string name="delete_user_data">Deleting user data.</string>
     <string name="adhar_success">Adhar data retrieved!</string>
+    <string name="pan_success">Pan data retrieved!</string>
+
     <string name="data_cleared">User data cleared.</string>
     <string name="no_user_data_present">No user data present to clear.</string>
-    <string name="loading_adhar_data">Loading Adhar data.</string>
+    <string name="capture">Capture</string>
+    <string name="user_data_retrived">User data retrived!</string>
+    <string name="try_gain">Try Again.</string>
 </resources>
