@@ -8,6 +8,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.CompoundButton;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -51,7 +52,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private static final int REQUEST_CAMERA_ACTIVITY = 10;
 
     private static int CURRENT_REQUEST;
-    File fileTemp=null;
+    File fileTemp = null;
     Button buttonAdhar, buttonPan, btnClear, btnExport;
     CheckBox checkBoxAdhar, checkBoxPan;
     UserData userData;
@@ -59,6 +60,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     ConstraintLayout constraintLayout;
     File filePath;
     UserDatabase userDatabase;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -78,12 +80,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         btnExport.setOnClickListener(this);
         checkBoxAdhar.setOnClickListener(this);
         checkBoxPan.setOnClickListener(this);
-        userData=new UserData();
+        userData = new UserData();
         disableCheckBoxClick();
         CURRENT_REQUEST = MY_PERMISSIONS_REQUEST_CAMERA_ADHAR;
         createDBObjectRX();
+        getLastUserDataRX();
     }
-
 
 
     @Override
@@ -91,8 +93,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == CropImage.CROP_IMAGE_ACTIVITY_REQUEST_CODE) {
-            Log.d("pavan", "onActivityResult: "+data);
-            Log.d("pavan3", "onActivityResult: "+requestCode+" "+resultCode);
+            Log.d("pavan", "onActivityResult: " + data);
+            Log.d("pavan3", "onActivityResult: " + requestCode + " " + resultCode);
 
             CropImage.ActivityResult result = CropImage.getActivityResult(data);
             if (resultCode == RESULT_OK) {
@@ -108,26 +110,22 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
             } else if (resultCode == CropImage.CROP_IMAGE_ACTIVITY_RESULT_ERROR_CODE) {
                 setUpSnackBar("e", getString(R.string.no_crop_image));
-            }
-            else {
+            } else {
                 deleteTempFile();
 
             }
 
-        }
-        else if(requestCode==REQUEST_CAMERA_ACTIVITY)
-        {
-            if(resultCode==RESULT_OK) {
-               // int req_type=data.getIntExtra("req_type",1);
+        } else if (requestCode == REQUEST_CAMERA_ACTIVITY) {
+            if (resultCode == RESULT_OK) {
+                // int req_type=data.getIntExtra("req_type",1);
 
                 String message = data.getStringExtra("file_path");
 
-                 fileTemp = new File(message);
+                fileTemp = new File(message);
                 Uri uri = Uri.fromFile(new File(message));
                 CropImage.activity(uri).setAutoZoomEnabled(true).setAllowFlipping(false)
                         .start(this);
-            }
-            else {
+            } else {
 
                 setUpSnackBar("e", getString(R.string.try_gain));
 
@@ -135,8 +133,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
 
     }
-    private void deleteTempFile(){
-        if(fileTemp!=null){
+
+    private void deleteTempFile() {
+        if (fileTemp != null) {
             fileTemp.delete();
         }
     }
@@ -150,7 +149,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 captureCard(MY_PERMISSIONS_REQUEST_CAMERA_ADHAR);
                 break;
             case R.id.btnPan:
-                    captureCard(MY_PERMISSIONS_REQUEST_CAMERA_PAN);
+                captureCard(MY_PERMISSIONS_REQUEST_CAMERA_PAN);
                 break;
             case R.id.btnExport:
                 getAllUserDataRX();
@@ -164,13 +163,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
 
-
     //Take Image of Adhar card or PAN card
     private void captureCard(int requestId) {
         CURRENT_REQUEST = requestId;
-        Intent intent=new Intent(MainActivity.this,CameraActivity.class);
-        intent.putExtra("req_type",requestId);
-        startActivityForResult(intent,REQUEST_CAMERA_ACTIVITY);
+        Intent intent = new Intent(MainActivity.this, CameraActivity.class);
+        intent.putExtra("req_type", requestId);
+        startActivityForResult(intent, REQUEST_CAMERA_ACTIVITY);
     }
 
     //Get Text from Adhar Card
@@ -211,19 +209,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
 
-
-
     //Get Name and Adhar number from Adhar card
     private void getNameAndAdharNo(@NotNull Text result) {
         String resultText = result.getText();
         boolean saveName = false;
+        String userName = null;
+
         if (resultText.contains(getString(R.string.govt)) || resultText.contains(getString(R.string.ind))) {
             for (Text.TextBlock block : result.getTextBlocks()) {
                 for (Text.Line line : block.getLines()) {
-                    if (saveName && userData.userName == null) {
+                    if (saveName && userName == null) {
+                        userName= line.getText();
                         userData.userName = line.getText();
+                        saveName=false;
                     }
-                    if (line.getText().contains(getString(R.string.govt)) || line.getText().contains(getString(R.string.ind))) {
+                    if ((line.getText().contains(getString(R.string.govt)) || line.getText().contains(getString(R.string.ind)))) {
                         saveName = true;
                     }
                     if (line.getText().length() == 14) {
@@ -236,7 +236,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             if (userData.userName != null && userData.userAdharNo != null) {
                 checkBoxAdhar.setChecked(true);
-                addDataToModel();
+                getLastUserDataAdharRX(userData.userName, userData.userAdharNo);
+                // addDataToModel();
+
                 setUpSnackBar("s", getString(R.string.adhar_success));
             } else {
                 setUpSnackBar("e", getString(R.string.no_adhar_data));
@@ -247,11 +249,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void addDataToModel() {
-        Log.d("pavan", "addDataToModel: "+userData.userName+" "+userData.userAdharNo+" "+userData.userPanNo);
- if(userData.userName!=null&&userData.userAdharNo!=null&&userData.userPanNo!=null){
-     addDataToDBRX(userData);
-     resetUserData();
- }
+        Log.d("pavan", "addDataToModel: " + userData.userName + " " + userData.userAdharNo + " " + userData.userPanNo);
+        if (userData.userName != null && userData.userAdharNo != null && userData.userPanNo != null) {
+            addDataToDBRX(userData);
+            resetUserData();
+        }
     }
 
 
@@ -270,9 +272,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
                 }
             }
-             if (userData.userPanNo != null) {
+            if (userData.userPanNo != null) {
                 checkBoxPan.setChecked(true);
-                addDataToModel();
+                getLastUserDataPanRX(userData.userPanNo);
+
+               // addDataToModel();
                 setUpSnackBar("s", getString(R.string.pan_success));
 
             } else {
@@ -285,19 +289,30 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
 
+
+
     // Exporting Data to Excel
     private void excelTransaction(List<UserData> userDataList) {
         if (!filePath.exists()) {
             try {
                 filePath.createNewFile();
-                createNewSheet(filePath,userDataList);
+                createNewSheet(filePath, userDataList);
             } catch (IOException e) {
 
                 setUpSnackBar("e", getString(R.string.no_export_data));
                 e.printStackTrace();
             }
         } else {
-            updateSheet(filePath,userDataList);
+            try {
+                filePath.delete();
+                filePath.createNewFile();
+                createNewSheet(filePath, userDataList);
+            } catch (IOException e) {
+
+                setUpSnackBar("e", getString(R.string.no_export_data));
+                e.printStackTrace();
+            }
+          //  updateSheet(filePath, userDataList);
         }
     }
 
@@ -340,7 +355,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         HSSFWorkbook hssfWorkbook;
         try {
             FileInputStream fis = new FileInputStream(filePath);
-            hssfWorkbook = new HSSFWorkbook(fis);
+            hssfWorkbook = new HSSFWorkbook();
             HSSFSheet hssfSheet = hssfWorkbook.getSheetAt(0);
             for (int userDataCount = 0; userDataCount < userDataList.size(); userDataCount++) {
                 HSSFRow hssfRow = hssfSheet.createRow(hssfSheet.getPhysicalNumberOfRows() + userDataCount);
@@ -378,9 +393,52 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     //Disable checkbox click
     private void disableCheckBoxClick() {
-        Log.d("pavan", "disableCheckBoxClick: ");
-        checkBoxAdhar.setOnCheckedChangeListener((buttonView, isChecked) -> checkBoxAdhar.setChecked(userData.userName != null && userData.userAdharNo != null&& userData.userPanNo == null));
-        checkBoxPan.setOnCheckedChangeListener((buttonView, isChecked) -> checkBoxPan.setChecked(userData.userPanNo != null&&userData.userName == null && userData.userAdharNo == null));
+        checkBoxAdhar.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            Log.d("pavan14", "disableCheckBoxClick: "+userData.userName+" "+userData.userAdharNo+" "+userData.userPanNo);
+
+            if(userData.userName != null && userData.userAdharNo != null && userData.userPanNo != null){
+                checkBoxAdhar.setChecked(false);
+                Log.d("pavan14", "disableCheckBoxClick: Don't check Adhar");
+            }
+            else if(userData.userName == null && userData.userAdharNo == null && userData.userPanNo== null)  {
+                checkBoxAdhar.setChecked(false);
+                Log.d("pavan14", "disableCheckBoxClick: Don't check Adhar");
+
+            }
+            else if(userData.userName != null ){
+                checkBoxAdhar.setChecked(true);
+                Log.d("pavan14", "disableCheckBoxClick:  check Adhar");
+
+            }
+            else {
+                checkBoxAdhar.setChecked(false);
+
+            }
+           // checkBoxAdhar.setChecked(userData.userName != null && userData.userAdharNo != null && userData.userPanNo == null);
+        });
+        checkBoxPan.setOnCheckedChangeListener((CompoundButton buttonView, boolean isChecked) -> {
+            Log.d("pavan14", "disableCheckBoxClick: "+userData.userName+" "+userData.userAdharNo+" "+userData.userPanNo);
+            if(userData.userName != null && userData.userAdharNo != null && userData.userPanNo != null){
+                checkBoxPan.setChecked(false);
+                Log.d("pavan14", "disableCheckBoxClick: Don't check pan");
+
+            }
+            else if(userData.userName == null && userData.userAdharNo == null && userData.userPanNo== null)  {
+                checkBoxPan.setChecked(false);
+                Log.d("pavan14", "disableCheckBoxClick: Don't check pan");
+
+            }
+            else if(userData.userPanNo != null ){
+                checkBoxPan.setChecked(true);
+                Log.d("pavan14", "disableCheckBoxClick:  check pan");
+
+            }
+            else {
+                checkBoxPan.setChecked(false);
+
+            }
+            //checkBoxPan.setChecked(userData.userPanNo != null && userData.userName == null && userData.userAdharNo == null);
+        });
     }
 
 
@@ -407,17 +465,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
 
-
-
     //Clear user model
     private void resetUserData() {
+        if(userData.userAdharNo!=null&&userData.userPanNo!=null&&userData.userName!=null){
+            userData=new UserData();
+        }
         checkBoxAdhar.setChecked(false);
         checkBoxPan.setChecked(false);
-        userData = new UserData();
 
     }
-
-
 
 
     //Database  operation using RXJava
@@ -431,7 +487,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                     @Override
                     public void onNext(@NonNull UserDatabase db) {
-                        userDatabase =db;
+                        userDatabase = db;
                         Log.d("pavan ", "onNext:db created ");
                     }
 
@@ -445,6 +501,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
                 });
     }
+
     private void addDataToDBRX(UserData userData) {
         Observable.fromCallable(() -> addDataToDB(userData)).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Observer<Boolean>() {
@@ -452,14 +509,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     public void onSubscribe(@NonNull Disposable d) {
 
                     }
+
                     @Override
                     public void onNext(@NonNull Boolean bool) {
-                       if(bool){
-                           setUpSnackBar("s", getString(R.string.user_data_retrived));
-                       }
-                       else {
-                           setUpSnackBar("e","Please try again.");
-                       }
+                        if (bool) {
+                            setUpSnackBar("s", getString(R.string.user_data_retrived));
+                        } else {
+                            setUpSnackBar("e", "Please try again.");
+                        }
                     }
 
                     @Override
@@ -472,6 +529,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
                 });
     }
+
     private void getAllUserDataRX() {
         Observable.fromCallable(this::getAllUserData).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Observer<List<UserData>>() {
@@ -479,16 +537,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     public void onSubscribe(@NonNull Disposable d) {
 
                     }
+
                     @Override
                     public void onNext(@NonNull List<UserData> userDataList) {
-                        Log.d("pavan", "onNext: "+userDataList.size());
+                        Log.d("pavan5", "onNext: size " + userDataList.size());
                         if (userDataList.size() == 0) {
-                             setUpSnackBar("c", getString(R.string.no_data_to_export));
-                         } else {
-                                 excelTransaction(userDataList);
-
-                            deleteAllUsersRX();
-                         }
+                            setUpSnackBar("c", getString(R.string.no_data_to_export));
+                        } else {
+                            excelTransaction(userDataList);
+                            //deleteAllUsersRX();
+                        }
                     }
 
                     @Override
@@ -501,6 +559,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
                 });
     }
+
     private void deleteAllUsersRX() {
         Observable.fromCallable(this::deleteAllUserData).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Observer<Boolean>() {
@@ -508,9 +567,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     public void onSubscribe(@NonNull Disposable d) {
 
                     }
+
                     @Override
                     public void onNext(@NonNull Boolean bool) {
                     }
+
                     @Override
                     public void onError(@NonNull Throwable e) {
 
@@ -522,44 +583,250 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 });
     }
 
+
+    private void getLastUserDataAdharRX(String userName, String userAdharNo) {
+        Log.d("pavan5", "getLastUserDataRX: ");
+        Observable.fromCallable(() -> getLastUserDataAdhar(userName, userAdharNo)).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Observer<UserData>() {
+                    @Override
+                    public void onSubscribe(@NonNull Disposable d) {
+
+                    }
+
+                    @Override
+                    public void onNext(UserData userData) {
+                        Log.d("pavan10", "onNext: Adhar data updated");
+                        resetUserData();
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        Log.d("pavan5", "onError: " + e);
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        Log.d("pavan5", "onComplete: ");
+
+                    }
+                });
+    }
+
+    private void getLastUserDataPanRX(String userPanNo) {
+        Observable.fromCallable(() -> getLastUserDataPan(userPanNo)).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Observer<Boolean>() {
+                    @Override
+                    public void onSubscribe(@NonNull Disposable d) {
+
+                    }
+
+                    @Override
+                    public void onNext(Boolean bool) {
+                        Log.d("pavan10", "onNext:Pan data updated");
+                        resetUserData();
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        Log.d("pavan5", "onError: " + e);
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        Log.d("pavan5", "onComplete: ");
+
+                    }
+                });
+    }
+
+    private void getLastUserDataRX() {
+        Observable.fromCallable(() -> getLastUserData()).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Observer<UserData>() {
+                    @Override
+                    public void onSubscribe(@NonNull Disposable d) {
+
+                    }
+
+                    @Override
+                    public void onNext(UserData lastUserData) {
+                        Log.d("pavan11", "onNext: Adhar data updated"+lastUserData.userName);
+                        userData=lastUserData;
+                        checkBoxAdhar.setChecked(true);
+                        checkBoxPan.setChecked(true);
+                        }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        Log.d("pavan11", "onError: " + e);
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        Log.d("pavan5", "onComplete: ");
+
+                    }
+                });
+    }
+
+
+
+    private void insertAdharDataRX(String userName, String userAdharNo) {
+        Log.d("pavan5", "insertAdharDataRX: ");
+        Observable<Boolean> booleanObservable;
+        booleanObservable = Observable.fromCallable(() -> insertAdharData(userName, userAdharNo));
+        booleanObservable.subscribeOn(Schedulers.io());
+        booleanObservable.observeOn(AndroidSchedulers.mainThread());
+        booleanObservable.subscribe(new Observer<Boolean>() {
+            @Override
+            public void onSubscribe(@NonNull Disposable d) {
+
+            }
+
+            @Override
+            public void onNext(@NonNull Boolean bool) {
+                Log.d("pavan5", "onNext: " + bool);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable e) {
+                Log.d("pavan5", "onError: " + e);
+            }
+
+            @Override
+            public void onComplete() {
+            }
+        });
+    }
+
+    private boolean insertAdharData(String userName, String userAdharNo) {
+        if (userDatabase != null) {
+            UserDao userDao = userDatabase.userDao();
+            userDao.insertAdharData(userName, userAdharNo);
+            return true;
+        } else {
+            createDBObjectRX();
+            return false;
+        }
+    }
+
+
     @NotNull
-    private UserDatabase createDBObject(){
+    private UserDatabase createDBObject() {
         return Room.databaseBuilder(getApplicationContext(),
                 UserDatabase.class, "user_data").build();
     }
 
 
-    private boolean addDataToDB(UserData userData){
-        if(userDatabase !=null){
+    private boolean addDataToDB(UserData userData) {
+        if (userDatabase != null) {
             UserDao userDao = userDatabase.userDao();
             userDao.insertAll(userData);
             return true;
-        }
-        else {
+        } else {
             createDBObjectRX();
             return false;
         }
 
     }
-    private List<UserData> getAllUserData(){
-        if(userDatabase !=null){
-            UserDao userDao = userDatabase.userDao();
-            return userDao.getAll();
+
+    private UserData getLastUserData() {
+        if (userDatabase == null) {
+            userDatabase= Room.databaseBuilder(getApplicationContext(),
+                    UserDatabase.class, "user_data").build();
         }
-        else {
+            UserDao userDao = userDatabase.userDao();
+            Log.d("pavan11", "getLastUserData: " + userDao.getCount());
+
+            UserData userData = userDao.getRecentUser();
+            if (userData != null) {
+                return userData;
+            } else {
+                userData = new UserData();
+            }
+            return userData;
+
+    }
+
+
+    private UserData getLastUserDataAdhar(String userName, String userAdharNo) {
+        if (userDatabase != null) {
+
+            UserDao userDao = userDatabase.userDao();
+            if (userDao.getCount() == 0) {
+                Log.d("pavan5", "getLastUserDataAdhar:table has no data " + userDao.getCount());
+
+                userDao.insertAdharData(userName,userAdharNo);
+            } else {
+                UserData userDataTemp = userDao.getRecentUser();
+                if (userDataTemp.userPanNo == null) {
+                    Log.d("pavan5", "getLastUserDataAdhar: user doesnt have pan data " + userData.uid + " " + userData.userName + " " + userData.userPanNo);
+                    userDao.updateUseAdhar(userDataTemp.uid, userName, userAdharNo);
+                }else if(userDataTemp.userAdharNo==null){
+                    Log.d("pavan5", "getLastUserDataAdhar: user doesnt have adhar data");
+                    userDao.updateUseAdhar(userDataTemp.uid, userName, userAdharNo);
+
+                }
+
+                else {
+                    Log.d("pavan5", "getLastUserDataAdhar: user has both data "+userDataTemp.userPanNo);
+                    userDao.insertAdharData(userName,userAdharNo);
+                }
+            }
+
+        } else {
+            createDBObjectRX();
+        }
+        return userData;
+    }
+
+    private boolean getLastUserDataPan(String userPan) {
+        if (userDatabase != null) {
+            UserDao userDao = userDatabase.userDao();
+            if (userDao.getCount() == 0) {
+                Log.d("pavan5", "getLastUserDataPan: Table has zero data " + userDao.getCount());
+                userDao.insertPanData(userPan);
+            } else {
+                UserData userDataTemp = userDao.getRecentUser();
+                if (userDataTemp.userName == null) {
+                    Log.d("pavan5", "getLastUserDataPan: Table doesnot have adhar info ");
+                    userDao.updateUsePan(userDataTemp.uid, userPan);
+                } else if(userDataTemp.userPanNo==null) {
+                    Log.d("pavan5", "getLastUserDataPan: Table doesnot  has pan info "+userDataTemp.uid+" "+userPan);
+                    userDao.updateUsePan(userDataTemp.uid, userPan);
+                }
+                else {
+                    Log.d("pavan5", "getLastUserDataPan: Table  has both info "+userDataTemp.userName+" "+userDataTemp.userPanNo);
+                    userDao.insertPanData(userPan);
+                }
+            }
+
+        } else {
+            createDBObjectRX();
+        }
+        return true;
+    }
+
+    private List<UserData> getAllUserData() {
+        if (userDatabase != null) {
+            UserDao userDao = userDatabase.userDao();
+            Log.d("pavan5", "getAllUserData:count "+userDao.getCount());
+            return userDao.getAll();
+        } else {
             createDBObjectRX();
             return null;
         }
 
     }
 
-    private boolean deleteAllUserData(){
-        if(userDatabase !=null){
+    private boolean deleteAllUserData() {
+        if (userDatabase != null) {
             UserDao userDao = userDatabase.userDao();
             userDao.delete();
             return true;
-        }
-        else {
+        } else {
             createDBObjectRX();
             return false;
         }
@@ -575,31 +842,34 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     //To handle orientation change.
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState) {
-        if(userData!=null){
-            if(userData.userName!=null){
+        if (userData != null) {
+            if (userData.userName != null) {
                 savedInstanceState.putString("userName", userData.userName);
-            } if(userData.userAdharNo!=null){ savedInstanceState.putString("userAdharNo", userData.userAdharNo);
-            } if(userData.getUserPanNo()!=null){
+            }
+            if (userData.userAdharNo != null) {
+                savedInstanceState.putString("userAdharNo", userData.userAdharNo);
+            }
+            if (userData.getUserPanNo() != null) {
                 savedInstanceState.putString("userPan", userData.userPanNo);
             }
         }
         super.onSaveInstanceState(savedInstanceState);
     }
 
-//onRestoreInstanceState
+    //onRestoreInstanceState
     @Override
     public void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
-        userData=new UserData();
-        userData.userName=savedInstanceState.getString("userName");
-        userData.userAdharNo=savedInstanceState.getString("userAdharNo");
-        userData.userPanNo=savedInstanceState.getString("userPanNo");
-        updateCheckBox();
+        userData = new UserData();
+        userData.userName = savedInstanceState.getString("userName");
+        userData.userAdharNo = savedInstanceState.getString("userAdharNo");
+        userData.userPanNo = savedInstanceState.getString("userPanNo");
+       // updateCheckBox();
     }
 
     private void updateCheckBox() {
         Log.d("pavan", "updateCheckBox: ");
-        if(userData.userName != null && userData.userAdharNo != null&&userData.userPanNo==null){
+        if (userData.userName != null && userData.userAdharNo != null && userData.userPanNo == null) {
             checkBoxAdhar.setChecked(true);
         }
 
